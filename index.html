@@ -270,12 +270,25 @@
     transform:translateX(-130%);
   }
   .pro.in::after{transform:translateX(130%);transition:transform 1.5s var(--ease) .35s}
+  /* Scroll-linked motion: ambient drift in the hero, two-way reveals that
+     fade in and out with scroll position, and a hero that fades as it
+     scrolls away (the behaviour Dyce liked on goldenhourbloomsco.com) */
+  .hero{position:relative;overflow:hidden}
+  .hero-grid{position:relative}
+  .drift{position:absolute;inset:0;pointer-events:none}
+  .drift span{position:absolute;border-radius:50%;filter:blur(52px)}
+  .drift span:nth-child(1){width:430px;height:430px;left:-130px;top:-150px;background:rgba(255,102,136,.15);animation:driftA 22s ease-in-out infinite alternate}
+  .drift span:nth-child(2){width:330px;height:330px;right:-110px;top:16%;background:rgba(194,24,69,.10);animation:driftB 27s ease-in-out infinite alternate}
+  .drift span:nth-child(3){width:190px;height:190px;right:24%;bottom:-100px;background:rgba(255,183,165,.16);animation:driftA 18s ease-in-out infinite alternate-reverse}
+  @keyframes driftA{from{transform:translate(0,0) scale(1)}to{transform:translate(58px,32px) scale(1.12)}}
+  @keyframes driftB{from{transform:translate(0,0) scale(1.05)}to{transform:translate(-50px,42px) scale(.94)}}
   @media (prefers-reduced-motion: reduce){
     html{scroll-behavior:auto}
     .reveal{opacity:1;transform:none;transition:none}
     .hero .eyebrow,.hero h1,.hero .lede,.hero .hero-cta,.hero .hero-panel{animation:none}
     .card,.qa,.step,.pro,.btn-primary,.btn-ghost,.btn-apply{transition:none}
     .pro.in::after{display:none}
+    .drift span{animation:none}
   }
 </style>
 </head>
@@ -299,6 +312,7 @@
 
 <div class="container">
   <div class="hero">
+    <div class="drift" aria-hidden="true"><span></span><span></span><span></span></div>
     <div class="hero-grid">
       <div>
         <p class="eyebrow">Partnership program for local businesses</p>
@@ -574,26 +588,34 @@
 <script>
   (function () {
     var els = document.querySelectorAll(".reveal");
-    if (!("IntersectionObserver" in window)) {
+    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || !("IntersectionObserver" in window)) {
       els.forEach(function (el) { el.classList.add("in"); });
-      return;
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          entry.target.classList.toggle("in", entry.isIntersecting);
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+      els.forEach(function (el) { io.observe(el); });
     }
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("in");
-          io.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1, rootMargin: "0px 0px -6% 0px" });
-    els.forEach(function (el) { io.observe(el); });
     var bar = document.querySelector(".topbar");
-    var onScroll = function () { bar.classList.toggle("scrolled", window.scrollY > 6); };
-    window.addEventListener("scroll", onScroll, { passive: true });
+    var hero = document.querySelector(".hero");
+    var heroGrid = document.querySelector(".hero-grid");
+    var ticking = false;
+    var onScroll = function () {
+      bar.classList.toggle("scrolled", window.scrollY > 6);
+      if (!reduced && hero && heroGrid) {
+        var p = Math.min(window.scrollY / (hero.offsetHeight * 0.85), 1);
+        heroGrid.style.opacity = String(1 - p * 0.75);
+        heroGrid.style.transform = "translateY(" + (p * -16).toFixed(1) + "px)";
+      }
+      ticking = false;
+    };
+    window.addEventListener("scroll", function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+    }, { passive: true });
     onScroll();
-    setTimeout(function () {
-      els.forEach(function (el) { el.classList.add("in"); });
-    }, 2500);
   })();
 </script>
 </body>
